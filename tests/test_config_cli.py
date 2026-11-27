@@ -109,3 +109,19 @@ def test_stale_days_config():
     for bad in ("soon", "-1"):
         with pytest.raises(ConfigError):
             Config.from_env({"STALE_ALERT_DAYS": bad})
+
+
+def test_webhook_rejection_and_command_failure_reported(capsys):
+    class R:
+        def __init__(self, code):
+            self.status_code = code
+
+    assert Alerter("https://h.test", post=lambda *a, **k: R(204)).send("k", "m") is True
+    assert Alerter("https://h.test", post=lambda *a, **k: R(400)).send("k", "m") is False
+    assert "HTTP 400" in capsys.readouterr().err
+
+    class Done:
+        returncode = 3
+
+    assert Alerter(command="notify", run=lambda *a, **k: Done()).send("k", "m") is False
+    assert cli.cmd_alert_test(Config(), None, Alerter("https://h.test", post=lambda *a, **k: R(404)), None) == 1

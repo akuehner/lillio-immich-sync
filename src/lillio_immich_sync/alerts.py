@@ -57,17 +57,29 @@ class Alerter:
     def enabled(self) -> bool:
         return bool(self.webhook_url or self.command)
 
-    def send(self, kind: str, message: str) -> None:
+    def send(self, kind: str, message: str) -> bool:
+        """Deliver to every configured channel. Returns False if any channel failed (never raises)."""
+        ok = True
         message = message[:MAX_LEN]
         if self.webhook_url:
             try:
                 body = render_template(self.template, kind, message)
-                self._post(self.webhook_url, data=body, headers={"Content-Type": "application/json"}, timeout=15)
+                r = self._post(self.webhook_url, data=body, headers={"Content-Type": "application/json"}, timeout=15)
+                status = getattr(r, "status_code", 200)
+                if status >= 300:
+                    ok = False
+                    print(f"alert webhook rejected the message: HTTP {status}", file=sys.stderr)
             except Exception as e:  # noqa: BLE001
+                ok = False
                 print(f"alert webhook failed: {type(e).__name__}", file=sys.stderr)
         if self.command:
             try:
                 env = dict(os.environ, ALERT_KIND=kind, ALERT_MESSAGE=message)
-                self._run(shlex.split(self.command), input=message, text=True, env=env, timeout=30, check=False)
+                done = self._run(shlex.split(self.command), input=message, text=True, env=env, timeout=30, check=False)
+                if getattr(done, "returncode", 0):
+                    ok = False
+                    print(f"alert command exited {done.returncode}", file=sys.stderr)
             except Exception as e:  # noqa: BLE001
+                ok = False
                 print(f"alert command failed: {type(e).__name__}", file=sys.stderr)
+        return ok

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Callable
 
 from . import alerts as A
@@ -103,7 +104,7 @@ def resolve_albums(cfg, immich, child: Child) -> dict[str, str | None]:
 
 
 def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limit: int = 0, full: bool = False,
-             log: Callable = print) -> SyncResult:
+             log: Callable = print, now: datetime | None = None) -> SyncResult:
     result = SyncResult(dry_run=dry_run)
     synced: dict = state.load(SYNCED)
     meta: dict = state.load(META)
@@ -118,6 +119,11 @@ def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limi
         if not items and not incremental:
             log(f"child {child.name!r}: the journal has no photos or videos")
         result.found += len(items)
+        if items and not dry_run:
+            newest = max(i.created_at for i in items).isoformat()
+            known = meta.setdefault("newest", {}).get(child.id)
+            if not known or datetime.fromisoformat(newest) > datetime.fromisoformat(known):
+                meta["newest"][child.id] = newest
         todo = sorted((i for i in items
                        if i.key not in synced
                        and (cfg.sync_videos or i.kind == "image")
@@ -169,5 +175,26 @@ def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limi
             len(result.failed), "\n".join(sorted(result.failed.values())[:15])))
     meta["failed"] = sorted(result.failed)
     meta["backfilled"] = sorted(backfilled)
+    _stale_check(cfg, alerter, meta, result, now or datetime.now(timezone.utc))
     state.save(META, meta)
     return result
+
+
+def _stale_check(cfg, alerter, meta: dict, result: SyncResult, now: datetime) -> None:
+    """Alert once when a child's newest journal item is older than STALE_ALERT_DAYS; re-arm when fresh again.
+
+    A portal change that makes the journal look empty (rather than erroring) shows up here.
+    """
+    if not cfg.stale_alert_days:
+        return
+    alerted = set(meta.get("stale_alerted", []))
+    for child_id, newest in meta.get("newest", {}).items():
+        age_days = (now - datetime.fromisoformat(newest)).total_seconds() / 86400
+        if age_days > cfg.stale_alert_days:
+            if child_id not in alerted:
+                alerter.send(A.JOURNAL_STALE, f"lillio-immich-sync: no new journal items for child {child_id} in "
+                             f"{age_days:.0f} days (newest {newest[:10]}). Check the portal and `probe`.")
+                alerted.add(child_id)
+        else:
+            alerted.discard(child_id)
+    meta["stale_alerted"] = sorted(alerted)

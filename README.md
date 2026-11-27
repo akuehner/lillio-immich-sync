@@ -19,7 +19,8 @@ photos appear in Immich the same day. The first run backfills the whole journal.
 - **Never uploads twice**: a local record of synced items, plus Immich's own duplicate detection as a backstop.
   After the first full pass, runs stop paging as soon as they reach photos already synced.
 - **Isolates failures**: one broken file does not stop the rest, and it is retried next run.
-- **Alerts** through generic hooks (a JSON webhook and/or any command) when a run fails or items fail.
+- **Alerts** through generic hooks (a JSON webhook and/or any command): run failed, recovered, items failed, and
+  optionally when the journal has gone quiet for too long (a sign the portal changed). `alert-test` checks delivery.
 
 ## Quick start
 
@@ -52,6 +53,7 @@ Some daycare chains run Lillio under their own name and host. Set `LILLIO_BASE_U
 | `setup` | Prompt for logins and URLs, save them to the env file (mode 600), and test both logins |
 | `children` | List children visible to the account (id, name) |
 | `probe` | Print the journal response structure with captions, names and signed URLs removed |
+| `alert-test` | Send a test alert through the configured channels |
 | `list-albums` | List Immich albums (count, id, name) |
 
 Exit codes (`sync`): 0 success, 1 run failed or some items failed, 2 configuration error.
@@ -79,6 +81,7 @@ Environment variables (or an `--env-file`; real environment variables win).
 | `STATE_DIR` | `./state` | Where the record of synced items lives |
 | `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_TEMPLATE` | | Generic JSON webhook, see [docs/alerting.md](docs/alerting.md) |
 | `ALERT_COMMAND` | | Command run for each alert (message on stdin) |
+| `STALE_ALERT_DAYS` | `0` (off) | Alert when no new journal items have appeared for this many days |
 
 ## Scheduling and deployment
 

@@ -20,7 +20,10 @@ import requests
 
 # Alert kinds (stable identifiers for filtering in your own command or template)
 RUN_FAILED = "run_failed"
+RUN_RECOVERED = "run_recovered"
 ITEMS_FAILED = "items_failed"
+JOURNAL_STALE = "journal_stale"
+TEST = "test"
 
 MAX_LEN = 1800
 

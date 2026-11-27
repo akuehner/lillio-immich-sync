@@ -80,4 +80,4 @@ docker run --rm --env-file .env -v lis-state:/state lillio-immich-sync sync
 3. `list-albums` to confirm the Immich key works.
 4. `sync --dry-run`, then `sync --limit 1`, and check the photo in Immich (date, caption, album).
 5. `sync` for the full backfill, then start `daemon` (or schedule `sync`).
-6. Send yourself a test alert, for example by running once with a wrong `LILLIO_PASSWORD`.
+6. `alert-test` to confirm alerts reach you.

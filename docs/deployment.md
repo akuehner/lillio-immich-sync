@@ -28,6 +28,9 @@ volumes:
   state:
 ```
 
+Compose expands `$WORDS` in `env_file` values unless they are single-quoted, so single-quote the alert template and
+any password containing `$` (`setup` already does).
+
 The image runs `daemon` by default. Add `command: ["daemon", "--run-now"]` to also sync once at startup.
 
 The `/state` volume must persist: it records which journal items are already in Immich. Losing it means the next

@@ -7,7 +7,7 @@ from lillio_immich_sync.setup import run_setup, set_values
 def test_set_values_replaces_active_then_commented_then_appends():
     text = "# head\nA=\n# B=old\n# C=x\nC=y\n"
     out = set_values(text, {"A": "1", "B": "2", "C": "3", "D": "4"})
-    assert out == '# head\nA="1"\nB="2"\n# C=x\nC="3"\nD="4"\n'
+    assert out == "# head\nA='1'\nB='2'\n# C=x\nC='3'\nD='4'\n"
 
 
 def test_quoting_round_trips_awkward_passwords():
@@ -50,3 +50,8 @@ def test_setup_creates_missing_file_and_reports_failed_check(tmp_path):
                    check=lambda cfg, out: False)
     assert rc == 1 and env.exists()
     assert parse_env_file(env.read_text())["LILLIO_BASE_URL"] == "https://app.lillio.com"
+
+
+def test_dollar_values_single_quoted_for_compose():
+    assert set_values("", {"T": '{"content": "$MESSAGE"}'}) == "T='{\"content\": \"$MESSAGE\"}'\n"
+    assert set_values("", {"P": "it's"}) == 'P="it\'s"\n'

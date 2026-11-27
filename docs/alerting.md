@@ -16,10 +16,13 @@ Failed items are not marked as synced, so the next run retries them.
 `ALERT_WEBHOOK_URL` receives a POST of `ALERT_WEBHOOK_TEMPLATE` with `$MESSAGE` and `$KIND` substituted
 (JSON-escaped, without surrounding quotes). The result must be valid JSON.
 
+Keep the single quotes shown below: docker compose expands `$MESSAGE` itself in unquoted or double-quoted
+`env_file` values, which would leave the alert text blank.
+
 ```bash
-ALERT_WEBHOOK_TEMPLATE={"text": "$MESSAGE"}        # Slack-style (default)
-ALERT_WEBHOOK_TEMPLATE={"content": "$MESSAGE"}     # Discord-style
-ALERT_WEBHOOK_TEMPLATE={"title": "lillio-immich-sync", "message": "$MESSAGE", "kind": "$KIND"}
+ALERT_WEBHOOK_TEMPLATE='{"text": "$MESSAGE"}'        # Slack-style (default)
+ALERT_WEBHOOK_TEMPLATE='{"content": "$MESSAGE"}'     # Discord-style
+ALERT_WEBHOOK_TEMPLATE='{"title": "lillio-immich-sync", "message": "$MESSAGE", "kind": "$KIND"}'
 ```
 
 ## Command

@@ -21,8 +21,9 @@ DEFAULTS = {"LILLIO_BASE_URL": Config.lillio_base_url}
 
 
 def _quote(value: str) -> str:
-    # The env parser strips one pair of surrounding quotes, so quoting keeps spaces and symbols intact.
-    return '"' + value + '"'
+    """Single quotes where possible: docker compose does not expand $VARS inside them (it does in double
+    quotes and unquoted values), and this tool's env parser strips one pair of surrounding quotes."""
+    return ("'" + value + "'") if "'" not in value else ('"' + value + '"')
 
 
 def set_values(text: str, values: dict[str, str]) -> str:

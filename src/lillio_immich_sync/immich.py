@@ -1,6 +1,6 @@
 """Minimal Immich v3 REST client (API key auth).
 
-Permissions needed: asset.upload, asset.update, and, if IMMICH_ALBUM is set, album.read, album.create and
+Permissions needed: asset.upload, asset.update, and, if albums are used (IMMICH_ALBUM / IMMICH_EXTRA_ALBUMS), album.read, album.create and
 albumAsset.create.
 """
 from __future__ import annotations

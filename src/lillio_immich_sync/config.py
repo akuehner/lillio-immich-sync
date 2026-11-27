@@ -55,6 +55,8 @@ class Config:
     immich_url: str = ""
     immich_api_key: str = ""
     immich_album: str = ""  # template; {child} is replaced by the child's name. Empty = no album
+    immich_extra_albums: tuple[str, ...] = ()  # more album templates (IMMICH_EXTRA_ALBUMS, ';' separated)
+    immich_create_albums: bool = True  # create missing albums; off = a missing album is an error
     # Behaviour
     sync_videos: bool = True
     sync_since: date | None = None
@@ -110,6 +112,8 @@ class Config:
             immich_url=s("IMMICH_URL").rstrip("/"),
             immich_api_key=s("IMMICH_API_KEY"),
             immich_album=s("IMMICH_ALBUM"),
+            immich_extra_albums=tuple(x.strip() for x in s("IMMICH_EXTRA_ALBUMS").split(";") if x.strip()),
+            immich_create_albums=_flag(s("IMMICH_CREATE_ALBUMS"), True),
             sync_videos=_flag(s("SYNC_VIDEOS"), True),
             sync_since=since,
             sync_times=times,

@@ -65,8 +65,10 @@ def cmd_alert_test(cfg, args, alerter, state) -> int:
     if not alerter.enabled:
         print("no alert channel configured; set ALERT_WEBHOOK_URL and/or ALERT_COMMAND", file=sys.stderr)
         return 1
-    alerter.send(A.TEST, "lillio-immich-sync test alert: alert delivery works.")
-    print("test alert sent; check your channel (delivery errors, if any, are printed above)")
+    if not alerter.send(A.TEST, "lillio-immich-sync test alert: alert delivery works."):
+        print("test alert was NOT delivered (see the error above)", file=sys.stderr)
+        return 1
+    print("test alert delivered")
     return 0
 
 

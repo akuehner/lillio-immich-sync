@@ -69,3 +69,43 @@ def test_extra_albums_config():
     c = Config.from_env({"IMMICH_EXTRA_ALBUMS": "Family; Kids, 2026 ;;", "IMMICH_CREATE_ALBUMS": "0"})
     assert c.immich_extra_albums == ("Family", "Kids, 2026") and c.immich_create_albums is False
     assert Config.from_env({}).immich_create_albums is True
+
+
+def test_guarded_sync_failure_then_recovery(monkeypatch, tmp_path):
+    import argparse
+    from lillio_immich_sync.state import State
+    cfg = Config(lillio_password="hunter2", state_dir=tmp_path)
+    state, sent = State(tmp_path), []
+
+    class Rec:
+        def send(self, kind, msg):
+            sent.append((kind, msg))
+
+    args = argparse.Namespace(dry_run=False, limit=0, full=False)
+    outcomes = iter([RuntimeError("bad hunter2"), RuntimeError("still"), 0, 0])
+
+    def fake(*a):
+        o = next(outcomes)
+        if isinstance(o, Exception):
+            raise o
+        return o
+
+    monkeypatch.setattr(cli, "cmd_sync", fake)
+    assert [cli.guarded_sync(cfg, args, Rec(), state) for _ in range(4)] == [1, 1, 0, 0]
+    assert [k for k, _ in sent] == ["run_failed", "run_failed", "run_recovered"]
+    assert "hunter2" not in sent[0][1] and "<secret>" in sent[0][1]
+    assert sent[0][1].split("since ")[1][:16] == sent[1][1].split("since ")[1][:16]  # same failing_since
+
+
+def test_alert_test_command(tmp_path, capsys):
+    posted = []
+    a = Alerter("https://hook.test", post=lambda url, **kw: posted.append(kw["data"]))
+    assert cli.cmd_alert_test(Config(), None, a, None) == 0 and "test alert" in posted[0]
+    assert cli.cmd_alert_test(Config(), None, Alerter(), None) == 1
+
+
+def test_stale_days_config():
+    assert Config.from_env({"STALE_ALERT_DAYS": "5"}).stale_alert_days == 5
+    for bad in ("soon", "-1"):
+        with pytest.raises(ConfigError):
+            Config.from_env({"STALE_ALERT_DAYS": bad})

@@ -37,15 +37,37 @@ def cmd_sync(cfg, args, alerter, state) -> int:
     return 1 if result.failed else 0
 
 
-def _sync_alerting(cfg, args, alerter, state) -> int:
-    """One sync run that alerts on failure instead of raising (used by the daemon)."""
+RUN_STATUS = "run-status.json"
+
+
+def guarded_sync(cfg, args, alerter, state) -> int:
+    """One sync run that alerts instead of raising: run_failed on error, run_recovered on the first good run after."""
+    status = state.load(RUN_STATUS)
     try:
-        return cmd_sync(cfg, args, alerter, state)
+        rc = cmd_sync(cfg, args, alerter, state)
+    except ConfigError:
+        raise
     except Exception as e:  # noqa: BLE001
         msg = scrub(f"{type(e).__name__}: {e}", cfg.secrets())[:500]
-        alerter.send(A.RUN_FAILED, f"lillio-immich-sync sync failed: {msg}")
+        if not args.dry_run:
+            since = status.get("failing_since") or datetime.now(cfg.tz).isoformat(timespec="minutes")
+            alerter.send(A.RUN_FAILED, f"lillio-immich-sync sync failed (failing since {since}): {msg}")
+            state.save(RUN_STATUS, {"failing_since": since})
         print(f"sync failed: {msg}", file=sys.stderr, flush=True)
         return 1
+    if status.get("failing_since") and not args.dry_run:
+        alerter.send(A.RUN_RECOVERED, f"lillio-immich-sync recovered (was failing since {status['failing_since']}).")
+        state.save(RUN_STATUS, {})
+    return rc
+
+
+def cmd_alert_test(cfg, args, alerter, state) -> int:
+    if not alerter.enabled:
+        print("no alert channel configured; set ALERT_WEBHOOK_URL and/or ALERT_COMMAND", file=sys.stderr)
+        return 1
+    alerter.send(A.TEST, "lillio-immich-sync test alert: alert delivery works.")
+    print("test alert sent; check your channel (delivery errors, if any, are printed above)")
+    return 0
 
 
 def cmd_daemon(cfg, args, alerter, state, *, now=None, sleep=time.sleep, max_runs: int = 0) -> int:
@@ -59,14 +81,14 @@ def cmd_daemon(cfg, args, alerter, state, *, now=None, sleep=time.sleep, max_run
           f"{','.join(DAY_NAMES[d] for d in sorted(cfg.sync_days))} ({cfg.timezone})", flush=True)
     runs = 0
     if args.run_now:
-        _sync_alerting(cfg, args, alerter, state)
+        guarded_sync(cfg, args, alerter, state)
         runs += 1
     while not max_runs or runs < max_runs:
         due = next_run(now(), cfg.sync_times, cfg.sync_days)
         print(f"next sync {due.isoformat()}", flush=True)
         while (remaining := (due - now()).total_seconds()) > 0:
             sleep(min(remaining, 300))  # wake periodically so clock changes and suspends are tolerated
-        _sync_alerting(cfg, args, alerter, state)
+        guarded_sync(cfg, args, alerter, state)
         runs += 1
     return 0
 
@@ -136,11 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("setup", help="prompt for logins, save them to the env file (default .env), and test them")
     sub.add_parser("children", help="list children visible to the Lillio account (id, name)")
     sub.add_parser("probe", help="print the journal response structure, content redacted (debugging)")
+    sub.add_parser("alert-test", help="send a test alert through the configured channels")
     sub.add_parser("list-albums", help="list Immich albums (count, id, name)")
     return p
 
 
-COMMANDS = {"sync": cmd_sync, "daemon": cmd_daemon, "children": cmd_children, "probe": cmd_probe, "list-albums": cmd_list_albums}
+COMMANDS = {"sync": guarded_sync, "alert-test": cmd_alert_test, "daemon": cmd_daemon, "children": cmd_children, "probe": cmd_probe, "list-albums": cmd_list_albums}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -166,7 +189,5 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except Exception as e:  # noqa: BLE001
         msg = scrub(f"{type(e).__name__}: {e}", cfg.secrets())[:500]
-        if args.command == "sync" and not args.dry_run:
-            alerter.send(A.RUN_FAILED, f"lillio-immich-sync sync failed: {msg}")
         print(f"{args.command} failed: {msg}", file=sys.stderr)
         return 1

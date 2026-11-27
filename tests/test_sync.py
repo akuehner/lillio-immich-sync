@@ -63,7 +63,8 @@ def test_failure_isolated_alerted_once_and_retried(cfg, state, rec):
     im = FakeImmich()
     run_sync(cfg, FakeLillio(journal()), im, state, rec, log=quiet)
     assert [f for f, _ in im.uploads] == ["lillio_20260301_100000_1-1-image.jpg"]
-    assert state.load(META) == {"failed": [], "backfilled": ["1"]}
+    meta = state.load(META)
+    assert meta["failed"] == [] and meta["backfilled"] == ["1"]
 
 
 def test_dry_run_writes_nothing(cfg, state, rec):
@@ -186,3 +187,27 @@ def test_name_and_id_for_same_album_dedupe(cfg, state, rec):
     run_sync(replace(cfg, immich_album="Family", immich_extra_albums=(SHARED_ID,)), FakeLillio(journal()), im,
              state, rec, log=quiet)
     assert len(im.album_assets[SHARED_ID]) == 3
+
+
+def test_stale_alert_once_then_rearms(cfg, state, rec):
+    from datetime import datetime, timezone
+    c = replace(cfg, stale_alert_days=5)
+    later = datetime(2026, 3, 10, 18, 0, tzinfo=timezone.utc)  # newest item 2026-03-03 -> 7 days old
+    run_sync(c, FakeLillio(journal()), FakeImmich(), state, rec, log=quiet, now=later)
+    assert [k for k, _ in rec.sent] == [A.JOURNAL_STALE]
+    run_sync(c, FakeLillio(journal()), FakeImmich(), state, rec, log=quiet, now=later)
+    assert len(rec.sent) == 1  # once per stale episode
+    j = journal()
+    j["1"].insert(0, page(activity(9, "2026-03-10T10:00:00Z")))
+    run_sync(c, FakeLillio(j), FakeImmich(), state, rec, log=quiet, now=later)
+    assert state.load(META)["stale_alerted"] == []  # fresh again: re-armed
+    run_sync(c, FakeLillio(j), FakeImmich(), state, rec, log=quiet,
+             now=datetime(2026, 3, 20, tzinfo=timezone.utc))
+    assert [k for k, _ in rec.sent] == [A.JOURNAL_STALE, A.JOURNAL_STALE]
+
+
+def test_stale_off_by_default(cfg, state, rec):
+    from datetime import datetime, timezone
+    run_sync(cfg, FakeLillio(journal()), FakeImmich(), state, rec, log=quiet,
+             now=datetime(2030, 1, 1, tzinfo=timezone.utc))
+    assert rec.sent == []

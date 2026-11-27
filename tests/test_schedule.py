@@ -78,6 +78,7 @@ def test_daemon_sleeps_until_due_and_runs(monkeypatch, tmp_path):
             sent.append(kind)
 
     args = argparse.Namespace(run_now=False, dry_run=False, limit=0, full=False)
-    cli.cmd_daemon(cfg, args, Rec(), None, now=lambda: clock[0], sleep=fake_sleep, max_runs=2)
+    from lillio_immich_sync.state import State
+    cli.cmd_daemon(cfg, args, Rec(), State(tmp_path / "st"), now=lambda: clock[0], sleep=fake_sleep, max_runs=2)
     assert runs == [datetime(2026, 3, 2, 18, 0, tzinfo=NY), datetime(2026, 3, 3, 18, 0, tzinfo=NY)]
-    assert sent == ["run_failed"]
+    assert sent == ["run_failed", "run_recovered"]

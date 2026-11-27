@@ -65,6 +65,7 @@ class Config:
     sync_days: frozenset[int] = frozenset(range(7))
     state_dir: Path = Path("state")
     # Alerts (all optional; both channels can be used together)
+    stale_alert_days: float = 0.0  # alert when the newest journal item is older than this; 0 = off
     alert_webhook_url: str = ""
     alert_webhook_template: str = '{"text": "$MESSAGE"}'
     alert_command: str = ""
@@ -75,6 +76,18 @@ class Config:
 
         def s(name: str, default: str = "") -> str:
             return e.get(name, default).strip()
+
+        def num(name: str, default: float) -> float:
+            raw = s(name)
+            if not raw:
+                return default
+            try:
+                value = float(raw)
+            except ValueError:
+                raise ConfigError(f"{name} must be a number") from None
+            if value < 0:
+                raise ConfigError(f"{name} must not be negative")
+            return value
 
         since = None
         if s("SYNC_SINCE"):
@@ -119,6 +132,7 @@ class Config:
             sync_times=times,
             sync_days=days,
             state_dir=Path(s("STATE_DIR") or defaults.state_dir),
+            stale_alert_days=num("STALE_ALERT_DAYS", 0.0),
             alert_webhook_url=s("ALERT_WEBHOOK_URL"),
             alert_webhook_template=s("ALERT_WEBHOOK_TEMPLATE") or defaults.alert_webhook_template,
             alert_command=s("ALERT_COMMAND"),

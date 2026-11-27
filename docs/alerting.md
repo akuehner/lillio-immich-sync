@@ -6,8 +6,13 @@ No notification service is assumed. Configure a JSON webhook, a command, or both
 
 | Kind | When |
 |---|---|
-| `run_failed` | The run could not complete: login failed, the portal format changed, Immich unreachable |
+| `run_failed` | The run could not complete: login failed, the portal format changed, Immich unreachable. Says since when it has been failing |
+| `run_recovered` | The first successful run after one or more failed runs |
 | `items_failed` | Some photos or videos failed; the rest were synced. Sent once per distinct set of failures |
+| `journal_stale` | The newest journal item is older than `STALE_ALERT_DAYS` (off by default). Once per quiet spell, re-armed when new items appear. Catches a portal change that makes the journal look empty instead of failing |
+| `test` | Sent by the `alert-test` command |
+
+Run `lillio-immich-sync alert-test` after configuring a channel to confirm delivery.
 
 Failed items are not marked as synced, so the next run retries them.
 

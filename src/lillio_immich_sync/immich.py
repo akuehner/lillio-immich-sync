@@ -28,6 +28,9 @@ class ImmichClient:
     def albums(self) -> list[dict]:
         return self._req("GET", "/albums", 30).json()
 
+    def get_album(self, album_id: str) -> dict:
+        return self._req("GET", f"/albums/{album_id}", 30).json()
+
     def find_album(self, name: str) -> dict | None:
         """Exact match after trimming whitespace (the web UI can leave trailing spaces in names)."""
         matches = [a for a in self.albums() if a["albumName"].strip() == name.strip()]

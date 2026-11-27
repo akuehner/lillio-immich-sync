@@ -69,8 +69,8 @@ Environment variables (or an `--env-file`; real environment variables win).
 | `TIMEZONE` | `UTC` | Your local zone (e.g. `America/New_York`): the schedule, and portal timestamps without an offset |
 | `IMMICH_URL` | | Base URL of your Immich server |
 | `IMMICH_API_KEY` | | API key (see permissions above) |
-| `IMMICH_ALBUM` | none | Album name; `{child}` is replaced by the child's name |
-| `IMMICH_EXTRA_ALBUMS` | none | More albums to add every item to, separated by `;` (e.g. an existing shared album). `{child}` works here too |
+| `IMMICH_ALBUM` | none | Album name (`{child}` is replaced by the child's name), or an existing album's id or URL |
+| `IMMICH_EXTRA_ALBUMS` | none | More albums to add every item to, separated by `;`. Each is a name (`{child}` allowed), or an existing album's id or URL copied from the browser |
 | `IMMICH_CREATE_ALBUMS` | `1` | Create albums that do not exist. Set `0` to require them to exist, so a typo stops the run instead of creating a stray album |
 | `SYNC_VIDEOS` | `1` | Set `0` to skip videos |
 | `SYNC_SINCE` | | Ignore items older than this date (`YYYY-MM-DD`) |

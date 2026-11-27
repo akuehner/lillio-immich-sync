@@ -162,3 +162,27 @@ def test_extra_albums_only_without_primary(cfg, state, rec):
     run_sync(replace(cfg, immich_extra_albums=("Family",), immich_create_albums=False), FakeLillio(journal()), im,
              state, rec, log=quiet)
     assert list(im.album_assets) == ["fam"] and len(im.album_assets["fam"]) == 3
+
+
+SHARED_ID = "11111111-2222-4333-8444-555555555555"
+
+
+def test_album_by_url_or_id(cfg, state, rec):
+    im = FakeImmich(albums=[{"id": SHARED_ID, "albumName": "Shared One "}])
+    c = replace(cfg, immich_extra_albums=(f"https://immich.example.com/albums/{SHARED_ID.upper()}", SHARED_ID),
+                immich_create_albums=False)
+    run_sync(c, FakeLillio(journal()), im, state, rec, log=quiet)
+    assert list(im.album_assets) == [SHARED_ID] and len(im.album_assets[SHARED_ID]) == 3  # deduped, added once each
+    assert im.created_albums == []
+
+
+def test_album_id_not_found_is_error(cfg, state, rec):
+    with pytest.raises(SyncError):
+        run_sync(replace(cfg, immich_album=SHARED_ID), FakeLillio(journal()), FakeImmich(), state, rec, log=quiet)
+
+
+def test_name_and_id_for_same_album_dedupe(cfg, state, rec):
+    im = FakeImmich(albums=[{"id": SHARED_ID, "albumName": "Family"}])
+    run_sync(replace(cfg, immich_album="Family", immich_extra_albums=(SHARED_ID,)), FakeLillio(journal()), im,
+             state, rec, log=quiet)
+    assert len(im.album_assets[SHARED_ID]) == 3

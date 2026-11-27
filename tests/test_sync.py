@@ -138,3 +138,27 @@ def test_repeating_page_terminates(cfg, state, rec):
 def test_unknown_journal_shape_propagates(cfg, state, rec):
     with pytest.raises(LillioError):
         run_sync(cfg, FakeLillio({"1": [{"nope": 1}]}), FakeImmich(), state, rec, log=quiet)
+
+
+def test_extra_albums_existing_and_templated(cfg, state, rec):
+    im = FakeImmich(albums=[{"id": "fam", "albumName": "Family"}])
+    c = replace(cfg, immich_album="Daycare - {child}", immich_extra_albums=("Family", "Daycare - {child}", "{child} 2026"))
+    run_sync(c, FakeLillio(journal(), children=[Child("1", "Ada")]), im, state, rec, log=quiet)
+    assert len(im.album_assets["fam"]) == 3
+    assert im.created_albums == ["Daycare - Ada", "Ada 2026"]  # duplicate template added once
+    assert all(len(v) == 3 for v in im.album_assets.values())
+
+
+def test_missing_album_is_error_when_creation_off(cfg, state, rec):
+    c = replace(cfg, immich_extra_albums=("Famliy",), immich_create_albums=False)
+    with pytest.raises(SyncError):
+        run_sync(c, FakeLillio(journal()), FakeImmich(albums=[{"id": "f", "albumName": "Family"}]), state, rec,
+                 log=quiet)
+    assert state.load(SYNCED) == {}
+
+
+def test_extra_albums_only_without_primary(cfg, state, rec):
+    im = FakeImmich(albums=[{"id": "fam", "albumName": "Family"}])
+    run_sync(replace(cfg, immich_extra_albums=("Family",), immich_create_albums=False), FakeLillio(journal()), im,
+             state, rec, log=quiet)
+    assert list(im.album_assets) == ["fam"] and len(im.album_assets["fam"]) == 3

@@ -14,7 +14,8 @@ photos appear in Immich the same day. The first run backfills the whole journal.
 - **Uploads originals** to Immich: the largest image size the portal offers, and videos (can be turned off).
 - **Keeps the context**: the photo's date in Immich is when the teacher posted it, and the activity title and
   description become the Immich description. The portal's stock caption ("Look what I'm doing today!") is dropped.
-- **Optionally files them in an album** per child (`IMMICH_ALBUM=Daycare - {child}`), created if missing.
+- **Optionally files them in albums**: one per child (`IMMICH_ALBUM=Daycare - {child}`) and any number of extra
+  albums, such as an existing shared family album (`IMMICH_EXTRA_ALBUMS`).
 - **Never uploads twice**: a local record of synced items, plus Immich's own duplicate detection as a backstop.
   After the first full pass, runs stop paging as soon as they reach photos already synced.
 - **Isolates failures**: one broken file does not stop the rest, and it is retried next run.
@@ -36,7 +37,8 @@ lillio-immich-sync --env-file .env daemon          # stay running, sync daily at
 ```
 
 Create the Immich API key under *Account Settings > API Keys* with `asset.upload` and `asset.update`, plus
-`album.read`, `album.create` and `albumAsset.create` if you use `IMMICH_ALBUM`. Photos land in the library of the
+`album.read`, `album.create` and `albumAsset.create` if you use albums. To add to an album shared with you, the key's
+user needs editor access to it. Photos land in the library of the
 user who owns the key.
 
 Some daycare chains run Lillio under their own name and host. Set `LILLIO_BASE_URL` to the address you sign in at.
@@ -68,6 +70,8 @@ Environment variables (or an `--env-file`; real environment variables win).
 | `IMMICH_URL` | | Base URL of your Immich server |
 | `IMMICH_API_KEY` | | API key (see permissions above) |
 | `IMMICH_ALBUM` | none | Album name; `{child}` is replaced by the child's name |
+| `IMMICH_EXTRA_ALBUMS` | none | More albums to add every item to, separated by `;` (e.g. an existing shared album). `{child}` works here too |
+| `IMMICH_CREATE_ALBUMS` | `1` | Create albums that do not exist. Set `0` to require them to exist, so a typo stops the run instead of creating a stray album |
 | `SYNC_VIDEOS` | `1` | Set `0` to skip videos |
 | `SYNC_SINCE` | | Ignore items older than this date (`YYYY-MM-DD`) |
 | `SYNC_TIMES` | `18:00` | `daemon` run times, local, comma separated (e.g. `07:30,18:00`) |

@@ -65,6 +65,26 @@ def album_name(template: str, child: Child) -> str:
     return template.replace("{child}", child.name).strip()
 
 
+def resolve_albums(cfg, immich, child: Child) -> dict[str, str | None]:
+    """Albums this child's items go into: IMMICH_ALBUM then IMMICH_EXTRA_ALBUMS, deduped, in order.
+
+    Value is the album id, or None if it does not exist yet (created on first upload). With
+    IMMICH_CREATE_ALBUMS off, a missing album is an error, so a typo cannot create a stray album.
+    """
+    names: list[str] = []
+    for template in (cfg.immich_album, *cfg.immich_extra_albums):
+        name = album_name(template, child) if template else ""
+        if name and name not in names:
+            names.append(name)
+    out: dict[str, str | None] = {}
+    for name in names:
+        album = immich.find_album(name)
+        if album is None and not cfg.immich_create_albums:
+            raise SyncError(f"Immich album {name!r} not found and IMMICH_CREATE_ALBUMS is off")
+        out[name] = album["id"] if album else None
+    return out
+
+
 def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limit: int = 0, full: bool = False,
              log: Callable = print) -> SyncResult:
     result = SyncResult(dry_run=dry_run)
@@ -92,13 +112,9 @@ def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limi
             truncated = len(todo) > budget
             todo, budget = todo[:budget], max(0, budget - len(todo))
 
-        album_id = None
-        name = album_name(cfg.immich_album, child) if cfg.immich_album else ""
-        if name:
-            album = immich.find_album(name)
-            album_id = album["id"] if album else None
+        albums = resolve_albums(cfg, immich, child)  # name -> id (None = create on first upload)
         log(f"child {child.name!r}: {len(items)} items in journal, {len(todo)} to upload"
-            + (f", album {name!r} ({'exists' if album_id else 'will be created'})" if name else "")
+            + "".join(f", album {n!r} ({'exists' if i else 'will be created'})" for n, i in albums.items())
             + (" (incremental)" if incremental else " (full scan)"))
         if dry_run:
             for i in todo[:20]:
@@ -114,9 +130,9 @@ def run_sync(cfg, lillio, immich, state, alerter, *, dry_run: bool = False, limi
                     result.duplicates += 1
                 elif item.caption:
                     immich.set_description([asset_id], item.caption)
-                if name:
+                for name, album_id in albums.items():
                     if album_id is None:
-                        album_id = immich.create_album(name)["id"]
+                        album_id = albums[name] = immich.create_album(name)["id"]
                     immich.add_to_album(album_id, [asset_id])
             except Exception as e:  # noqa: BLE001
                 result.failed[item.key] = f"{item.filename()}: {type(e).__name__}: {str(e)[:120]}"

@@ -63,3 +63,9 @@ def test_missing_config_exit_code(capsys, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     assert cli.main(["sync"]) == 2
     assert "configuration error" in capsys.readouterr().err
+
+
+def test_extra_albums_config():
+    c = Config.from_env({"IMMICH_EXTRA_ALBUMS": "Family; Kids, 2026 ;;", "IMMICH_CREATE_ALBUMS": "0"})
+    assert c.immich_extra_albums == ("Family", "Kids, 2026") and c.immich_create_albums is False
+    assert Config.from_env({}).immich_create_albums is True

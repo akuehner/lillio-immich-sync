@@ -69,6 +69,12 @@ class FakeImmich:
     def albums(self):
         return self._albums
 
+    def get_album(self, album_id):
+        for a in self._albums:
+            if a["id"] == album_id:
+                return a
+        raise KeyError(album_id)
+
     def find_album(self, name):
         for a in self._albums:
             if a["albumName"].strip() == name.strip():

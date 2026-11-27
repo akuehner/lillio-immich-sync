@@ -1,6 +1,7 @@
 """Lillio journal -> Immich sync engine (resumable, deduped, alert-aware)."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -65,23 +66,39 @@ def album_name(template: str, child: Child) -> str:
     return template.replace("{child}", child.name).strip()
 
 
+ALBUM_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+
+
 def resolve_albums(cfg, immich, child: Child) -> dict[str, str | None]:
     """Albums this child's items go into: IMMICH_ALBUM then IMMICH_EXTRA_ALBUMS, deduped, in order.
 
-    Value is the album id, or None if it does not exist yet (created on first upload). With
-    IMMICH_CREATE_ALBUMS off, a missing album is an error, so a typo cannot create a stray album.
+    Each entry is an album name (with optional {child}), an album id, or an album URL from the web UI.
+    Returns album name -> id, where id is None if the album does not exist yet (created on first upload).
+    Ids and URLs must point at an existing album. With IMMICH_CREATE_ALBUMS off, a missing named album is
+    an error, so a typo cannot create a stray album.
     """
-    names: list[str] = []
-    for template in (cfg.immich_album, *cfg.immich_extra_albums):
-        name = album_name(template, child) if template else ""
-        if name and name not in names:
-            names.append(name)
     out: dict[str, str | None] = {}
-    for name in names:
-        album = immich.find_album(name)
-        if album is None and not cfg.immich_create_albums:
-            raise SyncError(f"Immich album {name!r} not found and IMMICH_CREATE_ALBUMS is off")
-        out[name] = album["id"] if album else None
+    for template in (cfg.immich_album, *cfg.immich_extra_albums):
+        if not template:
+            continue
+        m = ALBUM_ID.search(template)
+        if m:
+            try:
+                album = immich.get_album(m.group(0).lower())
+            except Exception as e:  # noqa: BLE001
+                raise SyncError(f"Immich album id {m.group(0)} not found or not accessible ({type(e).__name__})") from None
+            name, album_id = album["albumName"].strip(), album["id"]
+        else:
+            name = album_name(template, child)
+            if not name:
+                continue
+            album = immich.find_album(name)
+            if album is None and not cfg.immich_create_albums:
+                raise SyncError(f"Immich album {name!r} not found and IMMICH_CREATE_ALBUMS is off")
+            album_id = album["id"] if album else None
+        if album_id is not None and album_id in out.values():
+            continue
+        out.setdefault(name, album_id)
     return out
 
 

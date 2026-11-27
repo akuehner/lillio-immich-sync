@@ -24,7 +24,10 @@ DEFAULT_COOKIE_NAME = "_himama_session"
 # Boilerplate caption the portal uses when the teacher writes nothing
 BOILERPLATE = {"look what i'm doing today!", "look what i'm doing today"}
 IMAGE_SIZE_PREFERENCE = ("original", "big", "large", "full", "medium")
-_ACCOUNT_HREF = re.compile(r"^(?:https?://[^/]+)?/accounts/(\d+)/?$")
+# Menu links that also point at /accounts/<id> but are not the child's name
+NAV_LABELS = {"profile", "edit profile", "journal", "entries", "crew", "manage crew", "reports", "milestones",
+              "photos", "home", "headlines", "view", "view profile"}
+_ACCOUNT_HREF =re.compile(r"^(?:https?://[^/]+)?/accounts/(\d+)/?$")
 
 
 class LillioError(RuntimeError):
@@ -153,11 +156,13 @@ def parse_journal(data, child_id: str, default_tz: tzinfo = timezone.utc) -> tup
 
 def parse_children(html: str) -> list[Child]:
     soup = BeautifulSoup(html, "html.parser")
-    names: dict[str, str] = {}  # child id -> first non-empty link text (insertion order kept)
+    names: dict[str, str] = {}  # child id -> first link text that is not a menu label (insertion order kept)
     for a in soup.find_all("a", href=True):
         m = _ACCOUNT_HREF.match(a["href"].strip())
         if m:
             text = " ".join(a.get_text(" ").split())
+            if text.lower() in NAV_LABELS:
+                text = ""
             if not names.get(m.group(1)):
                 names[m.group(1)] = text
     return [Child(cid, name or cid) for cid, name in names.items()]

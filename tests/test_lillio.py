@@ -65,6 +65,12 @@ def test_parse_children_from_links():
     assert [(c.id, c.name) for c in parse_children(html)] == [("111", "Ada Smith"), ("222", "Bo")]
 
 
+def test_parse_children_skips_menu_labels():
+    html = """<a href="/accounts/5">Profile</a><a href="/accounts/5/journal">Journal</a><a href="/accounts/5"></a>
+              <a href="/accounts/5">Ada Smith</a><a href="/accounts/6">Profile</a>"""
+    assert [(c.id, c.name) for c in parse_children(html)] == [("5", "Ada Smith"), ("6", "6")]
+
+
 class FakeResp:
     def __init__(self, url, text="", status=200, payload=None):
         self.url, self.text, self.status_code, self._payload = url, text, status, payload
